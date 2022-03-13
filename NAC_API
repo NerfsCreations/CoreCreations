@@ -1,0 +1,137 @@
+local NERF_ADMIN_COMMANDS = script:GetCustomProperty("NerfAdminCommands"):WaitForObject() ---@type Folder
+local NAC_ADMINS = require(script:GetCustomProperty("NAC_ADMINS"))
+local NAC_COMMANDS = require(script:GetCustomProperty("NAC_COMMANDS"))
+local MODULES = script:GetCustomProperty("Modules"):WaitForObject()
+local API = {}
+
+API.NAC_Version = 1.0 -- DO NOT CHANGE
+
+API.Settings = {
+    Prefix = NERF_ADMIN_COMMANDS:GetCustomProperty("DefaultPrefix"),
+    ReturnString = NERF_ADMIN_COMMANDS:GetCustomProperty("ReturnString"),
+    UsesAdmins = NERF_ADMIN_COMMANDS:GetCustomProperty("UsesAdmin"),
+    GameID = NERF_ADMIN_COMMANDS:GetCustomProperty("GameID"),
+    StorageKey = NERF_ADMIN_COMMANDS:GetCustomProperty("Storage"),
+    GlobalKey = NERF_ADMIN_COMMANDS:GetCustomProperty("NAC_GLOBAL"),
+    COMMAND_KEY = script:GetCustomProperty("UICommandKey")
+}
+--[[
+function SetData(data) --I have to set the variables individually else I will overwrite the script --WIP
+    API.Settings.Prefix = data.API.Settings.Prefix
+    API.Settings.ReturnString = data.API.Settings.ReturnString
+    API.Settings.UsesAdmins = data.API.Settings.UsesAdmins
+    API.Settings.GameID = data.API.Settings.GameID
+end
+
+function RestoreData() --WIP
+
+    if Storage.HasPendingSetConcurrentCreatorData(API.Settings.StorageKey) then return end
+
+    local data, result, message = Storage.SetConcurrentCreatorData(API.Settings.StorageKey, function(data)
+        if not data.API then
+            data.API = API
+            print("[NAC BACKUP]: Saved API.")
+            return data
+        elseif API.NAC_Version > data.API.NAC_Version then
+            print("[NAC BACKUP]: Restoring API backup.")
+            SetData(data)
+        end
+    end)
+end
+--RestoreData()
+]]
+API.Logs = {
+    JoinLeaveLogs = {},
+    ChatLogs = {},
+    CommandLogs = {},
+    EventLogs = {},
+    RankLogs = {},
+}
+
+API.CommandCodes = {
+    SUCCESS = 1,
+    FAILED = 2,
+    PLAYER_NOT_FOUND = 3,
+    INSUFFICIENT_RANK = 4,
+    COMMAND_NOT_FOUND = 5,
+    COMMAND_DISABLED = 6,
+}
+
+API.PlayerReferences = {
+    "all",
+    "others",
+    "me",
+    --"|",
+}
+
+API.RemovePlayer = function(player)
+    local playerToRemove = player
+    local copy = {}
+    for _, player in ipairs(Game.GetPlayers()) do
+        if player ~= playerToRemove then
+        copy[#copy + 1] = player
+        end
+    end
+    return copy
+end
+
+API.GetReference = function(speaker, msg)
+    if msg == "all" then
+        for _, players in ipairs(Game.GetPlayers()) do
+            return players
+        end
+    elseif msg == "others" then
+        local returnData = API.RemovePlayer(speaker)
+        return returnData
+    elseif msg == "me" then
+        return speaker
+    else
+        for _, player in ipairs(Game.GetPlayers()) do
+            if string.lower(player.name) == string.lower(msg) then
+                return player
+            end
+        end
+    end
+end
+
+API.GetRankLockRank = function(player1, player2)
+    for plrID, Rank in pairs(NAC_ADMINS.GAME_ADMINS.Admins) do
+        if plrID == player1.id then
+            for plrID2, Rank2 in pairs(NAC_ADMINS.GAME_ADMINS.Admins) do
+                if plrID == player2.id then
+                    if Rank >= Rank2 then
+                        return true
+                    else
+                        return false
+                    end
+                end
+            end
+        end
+    end
+end
+
+API.ReturnRankData = function(player, command)
+    local RankLvl
+    local MinimumRank
+    for cmd, settings in pairs(NAC_COMMANDS) do
+        if string.lower(cmd) == string.lower(command) then
+            MinimumRank = settings.AllowedRank
+            if MinimumRank == 0 or MinimumRank == 1 or MinimumRank == nil then
+                return true
+            else
+                for plrID, Rank in pairs(NAC_ADMINS.Admins) do
+                    if plrID == player.id then
+                        RankLvl = Rank
+                        if RankLvl >= MinimumRank then
+                            return true
+                        else
+                            return false
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+return API
